@@ -6,8 +6,6 @@ import { useNuiEvent } from '../../../hooks/useNuiEvent';
 import { fetchNui } from '../../../utils/fetchNui';
 import ScaleFade from '../../../transitions/ScaleFade';
 
-const radius = 60;
-
 export interface MenuItem {
   icon: IconProp;
   label: string;
@@ -62,8 +60,12 @@ const RadialMenu: React.FC = () => {
     sub: false,
   });
 
-  useNuiEvent('openRadialMenu', (data: { items: MenuItem[]; sub?: boolean } | false) => {
+  useNuiEvent('openRadialMenu', async (data: { items: MenuItem[]; sub?: boolean } | false) => {
     if (!data) return setVisible(false);
+    if (visible) {
+      setVisible(false);
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    }
     setMenu(data);
     setVisible(true);
   });
@@ -71,12 +73,6 @@ const RadialMenu: React.FC = () => {
   useNuiEvent('refreshItems', (data: MenuItem[]) => {
     setMenu({ ...menu, items: data });
   });
-
-  const handleClick = (index: number) => {
-    fetchNui('radialClick', index);
-    // TODO: shouldClose
-    setVisible(false);
-  };
 
   return (
     <>
@@ -100,7 +96,9 @@ const RadialMenu: React.FC = () => {
                   <g
                     transform={`rotate(-${index * pieAngle} 175 175)`}
                     className={classes.sector}
-                    onClick={() => handleClick(index)}
+                    onClick={() => fetchNui('radialClick', index)}
+                    onMouseEnter={() => fetchNui('radialHover', { index, entered: true })}
+                    onMouseLeave={() => fetchNui('radialHover', { index, entered: false })}
                   >
                     <path
                       d={`M175.01,175.01 l175,0 A175.01,175.01 0 0,0 ${175 + 175 * Math.cos(-degToRad(pieAngle))}, ${
@@ -124,11 +122,17 @@ const RadialMenu: React.FC = () => {
                 </>
               );
             })}
-            <g transform="translate(175, 175)" onClick={() => setVisible(false)}>
+            {/* TODO: rotate go back icon */}
+            <g
+              transform={`translate(175, 175)`}
+              onClick={() => {
+                menu.sub ? fetchNui('radialBack') : setVisible(false);
+              }}
+            >
               <circle r={30} className={classes.centerCircle} />
             </g>
             <FontAwesomeIcon
-              icon="xmark"
+              icon={!menu.sub ? 'xmark' : 'arrow-rotate-left'}
               className={classes.centerIcon}
               color="#fff"
               width={28}

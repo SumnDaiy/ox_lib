@@ -1,4 +1,5 @@
 local contextMenus = {}
+local currentHover = nil
 local openContextMenu = nil
 local keepInput = IsNuiFocusKeepingInput()
 
@@ -8,6 +9,7 @@ local keepInput = IsNuiFocusKeepingInput()
 ---@field icon? string
 ---@field iconColor? string
 ---@field onSelect? fun(args: any)
+---@field onHover? fun(hoverState: boolean, args: any)
 ---@field arrow? boolean
 ---@field description? string
 ---@field metadata? string | { [string]: any } | string[]
@@ -41,7 +43,23 @@ local function closeContext(_, cb, onExit)
 
     if not cb then SendNUIMessage({ action = 'hideContext' }) end
 
+    if currentHover then
+        local data = contextMenus[openContextMenu].options[currentHover]
+        if data.onHover then data.onHover(false, data.args) end
+        currentHover = nil
+    end
+
     openContextMenu = nil
+end
+
+local function checkID(id)
+    if math.type(tonumber(id)) == 'float' then
+        id = math.tointeger(id)
+    elseif tonumber(id) then
+        id += 1
+    end
+
+    return id
 end
 
 ---@param id string
@@ -89,14 +107,11 @@ RegisterNUICallback('openContext', function(data, cb)
     lib.showContext(data.id)
 end)
 
+
 RegisterNUICallback('clickContext', function(id, cb)
     cb(1)
 
-    if math.type(tonumber(id)) == 'float' then
-        id = math.tointeger(id)
-    elseif tonumber(id) then
-        id += 1
-    end
+    local id = checkID(id)
 
     local data = contextMenus[openContextMenu].options[id]
 
@@ -110,12 +125,28 @@ RegisterNUICallback('clickContext', function(id, cb)
     if data.event then TriggerEvent(data.event, data.args) end
     if data.serverEvent then TriggerServerEvent(data.serverEvent, data.args) end
 
+    if currentHover then
+        local data = contextMenus[openContextMenu].options[currentHover]
+        if data.onHover then data.onHover(false) end
+        currentHover = nil
+    end
+
     SendNUIMessage({
         action = 'hideContext'
     })
 end)
 
+RegisterNUICallback('onHover', function(data, cb)
+    cb(1)
+
+    local id = checkID(data.id)
+    local entered = data.entered
+    local data = contextMenus[openContextMenu].options[id]
+
+    if not data.onHover then return end
+
+    currentHover = entered and id
+    data.onHover(entered)
+end)
+
 RegisterNUICallback('closeContext', closeContext)
-
-
-
